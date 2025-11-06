@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Phaser Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.85.0/dist/phaser.js"></script>
+</head>
+<body>
+    <div id="test"></div>
+    <script>
+        // Jednoduchý test Phaser
+        console.log('Test script loaded');
+        console.log('Phaser:', typeof Phaser);
+
+        if (typeof Phaser !== 'undefined') {
+            console.log('Phaser version:', Phaser.VERSION);
+
+            const testConfig = {
+                type: Phaser.CANVAS,
+                width: 400,
+                height: 400,
+                parent: 'test',
+                backgroundColor: '#00ff00',
+                scene: {
+                    create: function() {
+                        console.log('Simple scene created!');
+                        this.add.text(200, 200, 'Phaser funguje!', {
+                            fontSize: '32px',
+                            fill: '#000'
+                        }).setOrigin(0.5);
+                    }
+                }
+            };
+
+            new Phaser.Game(testConfig);
+        } else {
+            console.error('Phaser se nenačetl!');
+            document.getElementById('test').innerHTML = '<h1 style="color:red;">Phaser se nenačetl!</h1>';
+        }
+    </script>
+</body>
+</html>
