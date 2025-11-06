@@ -33,6 +33,7 @@ console.log('Game created successfully');
 let car;
 let cursors;
 let spaceKey;
+let rKey;
 let obstacles = []; // Pole pro překážky
 let bonuses = []; // Pole pro bonusy (pneumatiky)
 let gameOver = false;
@@ -185,6 +186,7 @@ function create() {
     // Nastavíme ovládání
     cursors = this.input.keyboard.createCursorKeys();
     spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    rKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
 
     // Nastavíme kolizní detekci
     this.matter.world.on('collisionstart', (event) => {
@@ -284,9 +286,13 @@ function create() {
 
 function update() {
     if (gameOver) {
-        // Restartování hry po stisknutí mezerníku
-        if (spaceKey.isDown) {
+        // Restartování hry po stisknutí mezerníku (od levelu 1)
+        if (Phaser.Input.Keyboard.JustDown(spaceKey)) {
             restartGame(this);
+        }
+        // Pokračování v aktuálním levelu po stisknutí R
+        if (Phaser.Input.Keyboard.JustDown(rKey)) {
+            restartCurrentLevel(this);
         }
         return;
     }
@@ -615,16 +621,22 @@ function endGame(scene) {
         fill: '#fff'
     }).setOrigin(0.5);
 
-    // Text pro restart
-    restartText = scene.add.text(centerX, centerY + 110, 'Stiskněte MEZERNÍK pro restart', {
-        fontSize: '20px',
+    // Text pro restart od začátku
+    const restartText1 = scene.add.text(centerX, centerY + 100, 'MEZERNÍK - Restart od levelu 1', {
+        fontSize: '18px',
         fill: '#ffff00'
     }).setOrigin(0.5);
 
-    // Blikání textu
+    // Text pro pokračování v levelu
+    restartText = scene.add.text(centerX, centerY + 130, 'R - Zkusit znovu level ' + currentLevel, {
+        fontSize: '18px',
+        fill: '#00ff00'
+    }).setOrigin(0.5);
+
+    // Blikání obou textů
     scene.tweens.add({
-        targets: restartText,
-        alpha: 0,
+        targets: [restartText1, restartText],
+        alpha: 0.3,
         duration: 500,
         yoyo: true,
         repeat: -1
@@ -649,6 +661,27 @@ function nextLevel(scene) {
     driftSpeedBoostTime = 0;
 
     // Restartujeme scénu s novým levelem
+    scene.scene.restart();
+}
+
+function restartCurrentLevel(scene) {
+    gameOver = false;
+    currentSpeed = 0;
+
+    // Zachováme currentLevel, ale resetujeme bonusy
+    collectedBonuses = 0;
+
+    // Resetujeme rychlost policejních aut na default pro tento level
+    policeSpeedMultiplier = 1.0;
+
+    // Reset drift proměnných
+    isDrifting = false;
+    driftTime = 0;
+    driftBoost = 0;
+    driftSpeedBoost = 0;
+    driftSpeedBoostTime = 0;
+
+    // Restartujeme scénu s aktuálním levelem
     scene.scene.restart();
 }
 

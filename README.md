@@ -10,6 +10,10 @@ Akční závodní hra typu top-down s pokročilou drift mechanikou a dynamickou 
 - **Šipky vlevo/vpravo** - Zatáčení
 - **MEZERNÍK** - Drift (při zatáčení a rychlosti nad 50 km/h)
 
+### Ovládání po Game Over
+- **MEZERNÍK** - Restart od levelu 1
+- **R** - Zkusit znovu aktuální level
+
 ### Cíl hry
 Seberete všechny pneumatiky na mapě a postupujte do dalšího levelu, aniž byste narazili do policejních aut!
 
@@ -127,6 +131,9 @@ formula1-game/
 - Dosažený level
 - Celkový čas
 - Počet sebraných pneumatik
+- **Dvě možnosti restartu**:
+  - Začít od levelu 1 (MEZERNÍK)
+  - Zkusit znovu aktuální level (R)
 
 ## 🔧 Vývoj
 
