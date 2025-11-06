@@ -62,6 +62,17 @@ let driftParticles;
 let driftSpeedBoost = 0; // Speed boost po úspěšném driftu
 let driftSpeedBoostTime = 0; // Zbývající čas boostu
 
+// Mobilní ovládání
+let isMobile = false;
+let touchControls = {
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+    drift: false
+};
+let mobileButtons = {};
+
 function preload() {
     console.log('Preload started');
     // Načteme texturu hlíny jako pozadí
@@ -76,6 +87,105 @@ function preload() {
 
 function create() {
     console.log('Create started');
+
+    // Detekce mobilního zařízení
+    isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    console.log('Mobile device detected:', isMobile);
+
+    // Vytvoření virtuálních tlačítek pro mobilní zařízení
+    if (isMobile) {
+        const buttonSize = 80;
+        const buttonAlpha = 0.5;
+        const buttonColor = 0x333333;
+        const arrowColor = 0xffffff;
+
+        // Levé ovládání (šipky)
+        const leftControlX = 100;
+        const leftControlY = this.scale.height - 150;
+
+        // Tlačítko NAHORU
+        mobileButtons.up = this.add.circle(leftControlX, leftControlY - buttonSize, buttonSize/2, buttonColor, buttonAlpha)
+            .setInteractive()
+            .setScrollFactor(0)
+            .setDepth(1000);
+
+        // Šipka nahoru
+        const upArrow = this.add.triangle(leftControlX, leftControlY - buttonSize, 0, 20, -15, -20, 15, -20, arrowColor)
+            .setScrollFactor(0)
+            .setDepth(1001);
+
+        // Tlačítko DOLŮ
+        mobileButtons.down = this.add.circle(leftControlX, leftControlY + buttonSize, buttonSize/2, buttonColor, buttonAlpha)
+            .setInteractive()
+            .setScrollFactor(0)
+            .setDepth(1000);
+
+        // Šipka dolů
+        const downArrow = this.add.triangle(leftControlX, leftControlY + buttonSize, 0, -20, -15, 20, 15, 20, arrowColor)
+            .setScrollFactor(0)
+            .setDepth(1001);
+
+        // Tlačítko VLEVO
+        mobileButtons.left = this.add.circle(leftControlX - buttonSize, leftControlY, buttonSize/2, buttonColor, buttonAlpha)
+            .setInteractive()
+            .setScrollFactor(0)
+            .setDepth(1000);
+
+        // Šipka vlevo
+        const leftArrow = this.add.triangle(leftControlX - buttonSize, leftControlY, 20, 0, -20, -15, -20, 15, arrowColor)
+            .setScrollFactor(0)
+            .setDepth(1001);
+
+        // Tlačítko VPRAVO
+        mobileButtons.right = this.add.circle(leftControlX + buttonSize, leftControlY, buttonSize/2, buttonColor, buttonAlpha)
+            .setInteractive()
+            .setScrollFactor(0)
+            .setDepth(1000);
+
+        // Šipka vpravo
+        const rightArrow = this.add.triangle(leftControlX + buttonSize, leftControlY, -20, 0, 20, -15, 20, 15, arrowColor)
+            .setScrollFactor(0)
+            .setDepth(1001);
+
+        // Tlačítko DRIFT (vpravo)
+        const driftButtonX = this.scale.width - 100;
+        const driftButtonY = this.scale.height - 150;
+
+        mobileButtons.drift = this.add.circle(driftButtonX, driftButtonY, buttonSize/2, buttonColor, buttonAlpha)
+            .setInteractive()
+            .setScrollFactor(0)
+            .setDepth(1000);
+
+        // Text DRIFT
+        this.add.text(driftButtonX, driftButtonY, 'DRIFT', {
+            fontSize: '18px',
+            fill: '#fff',
+            fontStyle: 'bold'
+        }).setOrigin(0.5)
+          .setScrollFactor(0)
+          .setDepth(1001);
+
+        // Touch event handlers
+        mobileButtons.up.on('pointerdown', () => { touchControls.up = true; });
+        mobileButtons.up.on('pointerup', () => { touchControls.up = false; });
+        mobileButtons.up.on('pointerout', () => { touchControls.up = false; });
+
+        mobileButtons.down.on('pointerdown', () => { touchControls.down = true; });
+        mobileButtons.down.on('pointerup', () => { touchControls.down = false; });
+        mobileButtons.down.on('pointerout', () => { touchControls.down = false; });
+
+        mobileButtons.left.on('pointerdown', () => { touchControls.left = true; });
+        mobileButtons.left.on('pointerup', () => { touchControls.left = false; });
+        mobileButtons.left.on('pointerout', () => { touchControls.left = false; });
+
+        mobileButtons.right.on('pointerdown', () => { touchControls.right = true; });
+        mobileButtons.right.on('pointerup', () => { touchControls.right = false; });
+        mobileButtons.right.on('pointerout', () => { touchControls.right = false; });
+
+        mobileButtons.drift.on('pointerdown', () => { touchControls.drift = true; });
+        mobileButtons.drift.on('pointerup', () => { touchControls.drift = false; });
+        mobileButtons.drift.on('pointerout', () => { touchControls.drift = false; });
+    }
 
     // Definice kolizních kategorií
     const CATEGORY_PLAYER = 0x0001;
@@ -304,7 +414,11 @@ function create() {
     });
 
     // Instrukce
-    this.add.text(centerX, this.scale.height - 50, 'Šipky = pohyb | MEZERNÍK = drift při zatáčení', {
+    const instructionText = isMobile
+        ? 'Použijte virtuální tlačítka pro ovládání'
+        : 'Šipky = pohyb | MEZERNÍK = drift při zatáčení';
+
+    this.add.text(centerX, this.scale.height - 50, instructionText, {
         fontSize: '16px',
         fill: '#fff',
         backgroundColor: '#000',
@@ -332,7 +446,7 @@ function update() {
     let turning = false;
 
     // Pohyb vpřed
-    if (cursors.up.isDown) {
+    if (cursors.up.isDown || touchControls.up) {
         const angle = car.rotation;
         const speedMultiplier = isDrifting ? 1.2 : 1.0; // Mírně rychlejší během driftu
         const totalSpeedMultiplier = speedMultiplier * (1 + driftBoost) * (1 + driftSpeedBoost);
@@ -344,7 +458,7 @@ function update() {
         currentSpeed = Math.min(currentSpeed + 24, 1200 + driftBoost * 50); // Zvýšeno 3x (bylo +8, max 400)
     }
     // Pohyb vzad
-    else if (cursors.down.isDown) {
+    else if (cursors.down.isDown || touchControls.down) {
         const angle = car.rotation;
         car.setVelocity(
             -Math.sin(angle) * speed * 60,
@@ -355,7 +469,7 @@ function update() {
     }
 
     // Detekce zatáčení
-    if (cursors.left.isDown || cursors.right.isDown) {
+    if (cursors.left.isDown || cursors.right.isDown || touchControls.left || touchControls.right) {
         turning = true;
     }
 
@@ -363,7 +477,7 @@ function update() {
     const wasDrifting = isDrifting;
 
     // Aktivace driftu: mezerník + pohyb vpřed + zatáčení + minimální rychlost
-    if (spaceKey.isDown && cursors.up.isDown && turning && currentSpeed > 50) {
+    if ((spaceKey.isDown || touchControls.drift) && (cursors.up.isDown || touchControls.up) && turning && currentSpeed > 50) {
         if (!isDrifting) {
             isDrifting = true;
             driftTime = 0;
@@ -437,11 +551,11 @@ function update() {
     }
 
     // Otáčení doleva
-    if (cursors.left.isDown && moving) {
+    if ((cursors.left.isDown || touchControls.left) && moving) {
         car.setAngularVelocity(-turnSpeed);
     }
     // Otáčení doprava
-    else if (cursors.right.isDown && moving) {
+    else if ((cursors.right.isDown || touchControls.right) && moving) {
         car.setAngularVelocity(turnSpeed);
     }
     else {
@@ -509,17 +623,22 @@ function update() {
         // Pokud je na okraji a ještě necouvá, začni couvat a otáčet se
         if (atEdge && !obstacle.isReversing) {
             obstacle.isReversing = true;
-            obstacle.reversingTime = 60; // Couvej 1 sekundu
-            // Otoč se o 180°
-            obstacle.targetAngle = obstacle.angle + 180;
-            if (obstacle.targetAngle > 360) obstacle.targetAngle -= 360;
+            obstacle.reversingTime = Phaser.Math.Between(50, 80); // Náhodný čas couvání (0.8-1.3s)
+
+            // Otoč se o 180° + náhodný offset pro rozmanitost
+            const randomOffset = Phaser.Math.Between(-45, 45); // ±45° náhoda
+            obstacle.targetAngle = obstacle.angle + 180 + randomOffset;
+
+            // Normalizuj úhel
+            while (obstacle.targetAngle > 360) obstacle.targetAngle -= 360;
+            while (obstacle.targetAngle < 0) obstacle.targetAngle += 360;
         }
 
         // Pokud couvá
         if (obstacle.isReversing) {
             obstacle.reversingTime--;
 
-            // Plynulé otáčení o 180°
+            // Plynulé otáčení o 180° + náhodný offset
             let angleDiff = Phaser.Math.Angle.ShortestBetween(obstacle.angle, obstacle.targetAngle);
             if (Math.abs(angleDiff) > 2) {
                 if (angleDiff > 0) {
@@ -531,12 +650,18 @@ function update() {
                 obstacle.setAngularVelocity(0);
             }
 
-            // Couvání (pohyb vzad)
+            // Couvání (pohyb vzad) - silnější než dříve
             const angle = obstacle.rotation;
             obstacle.setVelocity(
-                -Math.sin(angle) * policeSpeed * 80,
-                Math.cos(angle) * policeSpeed * 80
+                -Math.sin(angle) * policeSpeed * 120, // Zvýšeno z 80 na 120
+                Math.cos(angle) * policeSpeed * 120
             );
+
+            // Extra odtlačení od okrajů
+            if (obstacle.x < 80) obstacle.x += 2;
+            if (obstacle.x > bounds.width - 80) obstacle.x -= 2;
+            if (obstacle.y < 80) obstacle.y += 2;
+            if (obstacle.y > bounds.height - 80) obstacle.y -= 2;
 
             // Konec couvání
             if (obstacle.reversingTime <= 0) {
