@@ -51,6 +51,7 @@ let bonusCount = 3;
 let collectedBonuses = 0;
 let gameTime = 0;
 let policeSpeedMultiplier = 1.0; // Multiplier rychlosti policejních aut
+let policeConfusedTime = 0; // Čas, kdy je policie zmatená (jede náhodně)
 
 // Drift proměnné
 let isDrifting = false;
@@ -75,6 +76,11 @@ function preload() {
 
 function create() {
     console.log('Create started');
+
+    // Definice kolizních kategorií
+    const CATEGORY_PLAYER = 0x0001;
+    const CATEGORY_POLICE = 0x0002;
+    const CATEGORY_BONUS = 0x0004;
 
     // Vytvoříme pozadí z textury hlíny - tileSprite pro opakování
     const background = this.add.tileSprite(0, 0, this.scale.width, this.scale.height, 'dirt');
@@ -101,6 +107,10 @@ function create() {
         width: 40,
         height: 70
     });
+
+    // Nastavíme kolizní kategorii pro hráče
+    car.setCollisionCategory(CATEGORY_PLAYER);
+    car.setCollidesWith([CATEGORY_PLAYER, CATEGORY_POLICE]); // Koliduje jen s hráčem a policií, NE s bonusy
 
     // Vytvoříme překážky - policejní auta (počet závisí na levelu)
     obstacles = [];
@@ -138,6 +148,10 @@ function create() {
         // Náhodný počáteční úhel
         obstacle.setAngle(Phaser.Math.Between(0, 360));
 
+        // Nastavíme kolizní kategorii pro policii
+        obstacle.setCollisionCategory(CATEGORY_POLICE);
+        obstacle.setCollidesWith([CATEGORY_PLAYER, CATEGORY_POLICE, CATEGORY_BONUS]); // Koliduje i s pneumatikami!
+
         // AI proměnné
         obstacle.changeDirectionTime = Phaser.Math.Between(60, 180); // Změní směr za 1-3 sekundy
         obstacle.targetAngle = obstacle.angle; // Cílový úhel
@@ -173,12 +187,16 @@ function create() {
         // Nastavíme velikost pneumatiky
         bonus.setDisplaySize(50, 50);
 
-        // Nastavíme kolizní tělo jako sensor (neblokuje pohyb)
+        // Nastavíme kolizní tělo - NENÍ sensor!
         bonus.setBody({
             type: 'circle',
             radius: 25
         });
-        bonus.setSensor(true); // Klíčové - neblokuje pohyb
+
+        // Nastavíme kolizní kategorii pro bonus
+        bonus.setCollisionCategory(CATEGORY_BONUS);
+        // Bonus koliduje s policií (blokuje je), ale ne s hráčem (hráč může sbírat)
+        bonus.setCollidesWith([CATEGORY_POLICE]); // Nekoliduje s CATEGORY_PLAYER!
 
         bonuses.push(bonus);
     }
@@ -188,7 +206,7 @@ function create() {
     spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     rKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
 
-    // Nastavíme kolizní detekci
+    // Nastavíme kolizní detekci pro překážky (policie)
     this.matter.world.on('collisionstart', (event) => {
         event.pairs.forEach((pair) => {
             const { bodyA, bodyB } = pair;
@@ -202,28 +220,38 @@ function create() {
                     }
                 }
             });
+        });
+    });
 
-            // Zkontrolujeme, zda auto sebralo bonus
-            bonuses.forEach((bonus, index) => {
-                if ((bodyA === car.body && bodyB === bonus.body) ||
-                    (bodyB === car.body && bodyA === bonus.body)) {
-                    // Sebrat bonus
-                    bonus.destroy();
-                    bonuses.splice(index, 1);
-                    collectedBonuses++;
+    // Samostatná detekce pro sběr bonusů - kontrolujeme vzdálenost
+    this.events.on('update', () => {
+        if (gameOver) return;
 
-                    // Zvýš rychlost policejních aut o 10%
-                    policeSpeedMultiplier += 0.1;
+        // Zkontroluj, zda je hráč dostatečně blízko k nějaké pneumatice
+        bonuses.forEach((bonus, index) => {
+            const distance = Phaser.Math.Distance.Between(car.x, car.y, bonus.x, bonus.y);
 
-                    // Aktualizuj UI
-                    bonusText.setText(`Bonusy: ${collectedBonuses}/${bonusCount}`);
+            // Pokud je hráč blízko (v dosahu 30px od středu)
+            if (distance < 35) {
+                // Sebrat bonus
+                bonus.destroy();
+                bonuses.splice(index, 1);
+                collectedBonuses++;
 
-                    // Zkontroluj, zda byly sebrány všechny bonusy
-                    if (collectedBonuses >= bonusCount) {
-                        nextLevel(this);
-                    }
+                // Zvýš rychlost policejních aut o 10%
+                policeSpeedMultiplier += 0.1;
+
+                // Zmatení policie na 10 sekund - jede náhodně
+                policeConfusedTime = 10;
+
+                // Aktualizuj UI
+                bonusText.setText(`Bonusy: ${collectedBonuses}/${bonusCount}`);
+
+                // Zkontroluj, zda byly sebrány všechny bonusy
+                if (collectedBonuses >= bonusCount) {
+                    nextLevel(this);
                 }
-            });
+            }
         });
     });
 
@@ -450,6 +478,22 @@ function update() {
         }
     }
 
+    // Odpočítávání času zmatení policie
+    if (policeConfusedTime > 0) {
+        policeConfusedTime -= 1/60;
+        if (policeConfusedTime < 0) {
+            policeConfusedTime = 0;
+        }
+
+        // Zobrazení upozornění, že je policie zmatená
+        levelText.setText(`Level: ${currentLevel} | Policie zmatená: ${Math.ceil(policeConfusedTime)}s`);
+        levelText.setStyle({ fill: '#ff00ff' }); // Fialová barva pro upozornění
+    } else {
+        // Normální zobrazení levelu
+        levelText.setText(`Level: ${currentLevel}`);
+        levelText.setStyle({ fill: '#00ff00' }); // Zelená barva
+    }
+
     // Pohyb policejních aut - 1/6 rychlosti formule (sníženo na 1/2), používá stejný engine
     const policeBaseSpeed = 0.016; // Základní rychlost - 1/6 rychlosti formule (0.096)
     const policeSpeed = policeBaseSpeed * policeSpeedMultiplier; // Aplikuj multiplier
@@ -499,42 +543,59 @@ function update() {
                 obstacle.isReversing = false;
             }
         } else {
-            // Normální režim - sledování hráče s vyhýbáním se pneumatikám
+            // Normální režim
 
-            // Zkontroluj, zda je nějaká pneumatika nebezpečně blízko
-            let avoidAngle = null;
-            const avoidDistance = 120; // Vzdálenost pro vyhýbání
+            let targetAngleDeg;
 
-            bonuses.forEach((bonus) => {
-                const distanceToBonus = Phaser.Math.Distance.Between(
-                    obstacle.x, obstacle.y,
-                    bonus.x, bonus.y
-                );
+            // Pokud je policie zmatená (sebrána pneumatika), jede náhodně
+            if (policeConfusedTime > 0) {
+                // ZMATENÝ REŽIM - náhodný pohyb
+                // Změna směru občas
+                obstacle.changeDirectionTime--;
+                if (obstacle.changeDirectionTime <= 0) {
+                    // Nový náhodný cílový úhel
+                    targetAngleDeg = Phaser.Math.Between(0, 360);
+                    obstacle.targetAngle = targetAngleDeg;
+                    obstacle.changeDirectionTime = Phaser.Math.Between(60, 120); // Častější změna směru
+                } else {
+                    targetAngleDeg = obstacle.targetAngle;
+                }
+            } else {
+                // NORMÁLNÍ REŽIM - sledování hráče s vyhýbáním se pneumatikám
 
-                if (distanceToBonus < avoidDistance) {
-                    // Vypočítej úhel PRYČ od pneumatiky
-                    const angleToBonus = Phaser.Math.Angle.Between(
+                // Zkontroluj, zda je nějaká pneumatika nebezpečně blízko
+                let avoidAngle = null;
+                const avoidDistance = 120; // Vzdálenost pro vyhýbání
+
+                bonuses.forEach((bonus) => {
+                    const distanceToBonus = Phaser.Math.Distance.Between(
                         obstacle.x, obstacle.y,
                         bonus.x, bonus.y
                     );
 
-                    // Otoč se opačným směrem (přidej 180°)
-                    avoidAngle = angleToBonus + Math.PI;
+                    if (distanceToBonus < avoidDistance) {
+                        // Vypočítej úhel PRYČ od pneumatiky
+                        const angleToBonus = Phaser.Math.Angle.Between(
+                            obstacle.x, obstacle.y,
+                            bonus.x, bonus.y
+                        );
+
+                        // Otoč se opačným směrem (přidej 180°)
+                        avoidAngle = angleToBonus + Math.PI;
+                    }
+                });
+
+                if (avoidAngle !== null) {
+                    // PRIORITA: Vyhni se pneumatice
+                    targetAngleDeg = Phaser.Math.RadToDeg(avoidAngle) + 90;
+                } else {
+                    // Sleduj hráče
+                    const angleToPlayer = Phaser.Math.Angle.Between(
+                        obstacle.x, obstacle.y,
+                        car.x, car.y
+                    );
+                    targetAngleDeg = Phaser.Math.RadToDeg(angleToPlayer) + 90;
                 }
-            });
-
-            let targetAngleDeg;
-
-            if (avoidAngle !== null) {
-                // PRIORITA: Vyhni se pneumatice
-                targetAngleDeg = Phaser.Math.RadToDeg(avoidAngle) + 90;
-            } else {
-                // Sleduj hráče
-                const angleToPlayer = Phaser.Math.Angle.Between(
-                    obstacle.x, obstacle.y,
-                    car.x, car.y
-                );
-                targetAngleDeg = Phaser.Math.RadToDeg(angleToPlayer) + 90;
             }
 
             // Normalizuj úhel
@@ -652,6 +713,7 @@ function nextLevel(scene) {
 
     // Resetujeme rychlost policejních aut na default
     policeSpeedMultiplier = 1.0;
+    policeConfusedTime = 0;
 
     // Resetujeme drift proměnné
     isDrifting = false;
@@ -673,6 +735,7 @@ function restartCurrentLevel(scene) {
 
     // Resetujeme rychlost policejních aut na default pro tento level
     policeSpeedMultiplier = 1.0;
+    policeConfusedTime = 0;
 
     // Reset drift proměnných
     isDrifting = false;
@@ -698,6 +761,7 @@ function restartGame(scene) {
 
     // Resetujeme rychlost policejních aut na default
     policeSpeedMultiplier = 1.0;
+    policeConfusedTime = 0;
 
     // Reset drift proměnných
     isDrifting = false;

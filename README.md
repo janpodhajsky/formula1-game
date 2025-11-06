@@ -45,8 +45,14 @@ Seberete všechny pneumatiky na mapě a postupujte do dalšího levelu, aniž by
 
 ### Bonusy (Pneumatiky)
 - **Sběr**: Jednoduše projeďte přes pneumatiku
-- **Efekt**: Zvyšuje rychlost policejních aut o 10%
-- **Strategie**: Fungují jako dočasná překážka pro policii
+- **Efekty**:
+  - Zvyšuje rychlost policejních aut o 10%
+  - **Zmatení policie na 10 sekund** - Policie přestane sledovat a jede náhodně!
+- **Strategie**:
+  - Fungují jako **fyzická překážka pro policii** - policie s nimi nemůže projet!
+  - Policie se jim aktivně vyhýbá
+  - Hráč může projet a sbírat je
+- **Vizuální indikace**: Fialový text "Policie zmatená: Xs" v levelu
 
 ## 🎯 UI prvky
 
@@ -104,8 +110,10 @@ formula1-game/
 
 ### Fyzikální engine
 - Realistické ovládání auta s friction
-- Kolizní detekce pomocí Matter.js
+- Pokročilá kolizní detekce pomocí Matter.js
+- **Collision filtering** - pneumatiky blokují policii, ale ne hráče
 - Fixed rotation pro stabilní ovládání
+- Distance-based pickup system pro bonusy
 
 ### Vizuální efekty
 - Částicový systém pro drift efekt
@@ -119,11 +127,13 @@ formula1-game/
 
 ## 🏆 Tipy a triky
 
-1. **Sbírejte rychle**: Čím déle čekáte, tím rychlejší je policie
-2. **Využívejte drift**: 20% speed boost může zachránit život
-3. **Pneumatiky jako štít**: Schováte se za ně před policií
-4. **Plánovejte trasu**: Minimalizujte vzdálenost mezi pneumatikami
-5. **Okraje mapy**: Udržujte se v centru pro lepší manévrovatelnost
+1. **Využijte zmatení**: Po sebrání pneumatiky máte 10s klidu - seber další!
+2. **Sbírejte strategicky**: První pneumatika = nejlehčí útěk, poslední = nejtěžší
+3. **Využívejte drift**: 20% speed boost může zachránit život
+4. **Pneumatiky jako bariéra**: Policie s nimi NEMŮŽE projet - použij je jako překážku!
+5. **Schováte se za pneumatiky**: Policie se jim vyhýbá a nemůže projet
+6. **Plánovejte trasu**: Minimalizujte vzdálenost mezi pneumatikami
+7. **Okraje mapy**: Udržujte se v centru pro lepší manévrovatelnost
 
 ## 📊 Herní statistiky
 
