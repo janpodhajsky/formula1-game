@@ -65,11 +65,9 @@ let driftSpeedBoostTime = 0; // Zbývající čas boostu
 // Mobilní ovládání
 let isMobile = false;
 let touchControls = {
-    up: false,
-    down: false,
-    left: false,
-    right: false,
-    drift: false
+    drift: false,
+    targetX: null,
+    targetY: null
 };
 let mobileButtons = {};
 
@@ -97,59 +95,10 @@ function create() {
         const buttonSize = 80;
         const buttonAlpha = 0.5;
         const buttonColor = 0x333333;
-        const arrowColor = 0xffffff;
-
-        // Levé ovládání (šipky)
-        const leftControlX = 100;
-        const leftControlY = this.scale.height - 150;
-
-        // Tlačítko NAHORU
-        mobileButtons.up = this.add.circle(leftControlX, leftControlY - buttonSize, buttonSize/2, buttonColor, buttonAlpha)
-            .setInteractive()
-            .setScrollFactor(0)
-            .setDepth(1000);
-
-        // Šipka nahoru
-        const upArrow = this.add.triangle(leftControlX, leftControlY - buttonSize, 0, 20, -15, -20, 15, -20, arrowColor)
-            .setScrollFactor(0)
-            .setDepth(1001);
-
-        // Tlačítko DOLŮ
-        mobileButtons.down = this.add.circle(leftControlX, leftControlY + buttonSize, buttonSize/2, buttonColor, buttonAlpha)
-            .setInteractive()
-            .setScrollFactor(0)
-            .setDepth(1000);
-
-        // Šipka dolů
-        const downArrow = this.add.triangle(leftControlX, leftControlY + buttonSize, 0, -20, -15, 20, 15, 20, arrowColor)
-            .setScrollFactor(0)
-            .setDepth(1001);
-
-        // Tlačítko VLEVO
-        mobileButtons.left = this.add.circle(leftControlX - buttonSize, leftControlY, buttonSize/2, buttonColor, buttonAlpha)
-            .setInteractive()
-            .setScrollFactor(0)
-            .setDepth(1000);
-
-        // Šipka vlevo
-        const leftArrow = this.add.triangle(leftControlX - buttonSize, leftControlY, 20, 0, -20, -15, -20, 15, arrowColor)
-            .setScrollFactor(0)
-            .setDepth(1001);
-
-        // Tlačítko VPRAVO
-        mobileButtons.right = this.add.circle(leftControlX + buttonSize, leftControlY, buttonSize/2, buttonColor, buttonAlpha)
-            .setInteractive()
-            .setScrollFactor(0)
-            .setDepth(1000);
-
-        // Šipka vpravo
-        const rightArrow = this.add.triangle(leftControlX + buttonSize, leftControlY, -20, 0, 20, -15, 20, 15, arrowColor)
-            .setScrollFactor(0)
-            .setDepth(1001);
 
         // Tlačítko DRIFT (vpravo)
         const driftButtonX = this.scale.width - 100;
-        const driftButtonY = this.scale.height - 150;
+        const driftButtonY = this.scale.height - 100;
 
         mobileButtons.drift = this.add.circle(driftButtonX, driftButtonY, buttonSize/2, buttonColor, buttonAlpha)
             .setInteractive()
@@ -165,26 +114,44 @@ function create() {
           .setScrollFactor(0)
           .setDepth(1001);
 
-        // Touch event handlers
-        mobileButtons.up.on('pointerdown', () => { touchControls.up = true; });
-        mobileButtons.up.on('pointerup', () => { touchControls.up = false; });
-        mobileButtons.up.on('pointerout', () => { touchControls.up = false; });
-
-        mobileButtons.down.on('pointerdown', () => { touchControls.down = true; });
-        mobileButtons.down.on('pointerup', () => { touchControls.down = false; });
-        mobileButtons.down.on('pointerout', () => { touchControls.down = false; });
-
-        mobileButtons.left.on('pointerdown', () => { touchControls.left = true; });
-        mobileButtons.left.on('pointerup', () => { touchControls.left = false; });
-        mobileButtons.left.on('pointerout', () => { touchControls.left = false; });
-
-        mobileButtons.right.on('pointerdown', () => { touchControls.right = true; });
-        mobileButtons.right.on('pointerup', () => { touchControls.right = false; });
-        mobileButtons.right.on('pointerout', () => { touchControls.right = false; });
-
+        // Touch event handlers pro drift
         mobileButtons.drift.on('pointerdown', () => { touchControls.drift = true; });
         mobileButtons.drift.on('pointerup', () => { touchControls.drift = false; });
         mobileButtons.drift.on('pointerout', () => { touchControls.drift = false; });
+
+        // Touch handler pro sledování prstu na celé obrazovce
+        this.input.on('pointerdown', (pointer) => {
+            // Ignoruj klik na drift tlačítko
+            if (pointer.x > driftButtonX - buttonSize/2 &&
+                pointer.x < driftButtonX + buttonSize/2 &&
+                pointer.y > driftButtonY - buttonSize/2 &&
+                pointer.y < driftButtonY + buttonSize/2) {
+                return;
+            }
+
+            touchControls.targetX = pointer.x;
+            touchControls.targetY = pointer.y;
+        });
+
+        this.input.on('pointermove', (pointer) => {
+            if (pointer.isDown) {
+                // Ignoruj klik na drift tlačítko
+                if (pointer.x > driftButtonX - buttonSize/2 &&
+                    pointer.x < driftButtonX + buttonSize/2 &&
+                    pointer.y > driftButtonY - buttonSize/2 &&
+                    pointer.y < driftButtonY + buttonSize/2) {
+                    return;
+                }
+
+                touchControls.targetX = pointer.x;
+                touchControls.targetY = pointer.y;
+            }
+        });
+
+        this.input.on('pointerup', () => {
+            touchControls.targetX = null;
+            touchControls.targetY = null;
+        });
     }
 
     // Definice kolizních kategorií
@@ -205,17 +172,19 @@ function create() {
     car.setMass(10);
     car.setFixedRotation(); // Auto se nebude samo otáčet
 
-    // Nastavíme správnou velikost - scale obrázek na 40x70
-    car.setDisplaySize(40, 70);
+    // Nastavíme správnou velikost - na mobilu 30% menší (70% původní velikosti)
+    const carWidth = isMobile ? 28 : 40;
+    const carHeight = isMobile ? 49 : 70;
+    car.setDisplaySize(carWidth, carHeight);
 
     // Otočíme auto vertikálně - předek na zadek
     car.setFlipY(true);
 
-    // Nastavíme přesnou velikost kolizního těla podle textury (40x70)
+    // Nastavíme přesnou velikost kolizního těla podle textury
     car.setBody({
         type: 'rectangle',
-        width: 40,
-        height: 70
+        width: carWidth,
+        height: carHeight
     });
 
     // Nastavíme kolizní kategorii pro hráče
@@ -224,7 +193,7 @@ function create() {
 
     // Vytvoříme překážky - policejní auta (počet závisí na levelu)
     obstacles = [];
-    const minDistance = 70 * 5; // 5x velikost formule (výška auta je 70px)
+    const minDistance = carHeight * 5; // 5x velikost formule
 
     for (let i = 0; i < obstacleCount; i++) {
         let randomX, randomY, distance;
@@ -242,17 +211,21 @@ function create() {
         obstacle.setMass(15); // Těžší než hráčovo auto
         obstacle.setFixedRotation(); // Neotáčí se samo
 
-        // Nastavíme rozumnou velikost policejního auta (širší než hráčovo auto)
-        obstacle.setDisplaySize(55, 70);
+        // Nastavíme rozumnou velikost policejního auta (širší než hráčovo auto) - na mobilu 30% menší
+        const policeWidth = isMobile ? 38.5 : 55;
+        const policeHeight = isMobile ? 49 : 70;
+        obstacle.setDisplaySize(policeWidth, policeHeight);
 
         // Otočíme policejní auto také
         obstacle.setFlipY(true);
 
         // Nastavíme kolizní tělo - o 5px menší pro lepší hratelnost
+        const policeBodyWidth = isMobile ? 35 : 50;
+        const policeBodyHeight = isMobile ? 45.5 : 65;
         obstacle.setBody({
             type: 'rectangle',
-            width: 50,
-            height: 65
+            width: policeBodyWidth,
+            height: policeBodyHeight
         });
 
         // Náhodný počáteční úhel
@@ -294,13 +267,15 @@ function create() {
         const bonus = this.matter.add.image(randomX, randomY, 'tire');
         bonus.setStatic(true);
 
-        // Nastavíme velikost pneumatiky
-        bonus.setDisplaySize(50, 50);
+        // Nastavíme velikost pneumatiky - na mobilu 30% menší
+        const tireSize = isMobile ? 35 : 50;
+        bonus.setDisplaySize(tireSize, tireSize);
 
         // Nastavíme kolizní tělo - NENÍ sensor!
+        const tireRadius = isMobile ? 17.5 : 25;
         bonus.setBody({
             type: 'circle',
-            radius: 25
+            radius: tireRadius
         });
 
         // Nastavíme kolizní kategorii pro bonus
@@ -341,8 +316,9 @@ function create() {
         bonuses.forEach((bonus, index) => {
             const distance = Phaser.Math.Distance.Between(car.x, car.y, bonus.x, bonus.y);
 
-            // Pokud je hráč blízko (v dosahu 30px od středu)
-            if (distance < 35) {
+            // Pokud je hráč blízko - na mobilu úměrně menší vzdálenost (30% menší)
+            const pickupDistance = isMobile ? 24.5 : 35;
+            if (distance < pickupDistance) {
                 // Sebrat bonus
                 bonus.destroy();
                 bonuses.splice(index, 1);
@@ -369,28 +345,28 @@ function create() {
     timerText = this.add.text(16, 16, 'Čas: 0:00', {
         fontSize: '20px',
         fill: '#fff',
-        backgroundColor: '#000',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         padding: { x: 10, y: 5 }
     });
 
     bonusText = this.add.text(16, 46, `Bonusy: ${collectedBonuses}/${bonusCount}`, {
         fontSize: '20px',
         fill: '#ffff00',
-        backgroundColor: '#000',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         padding: { x: 10, y: 5 }
     });
 
     levelText = this.add.text(16, 76, `Level: ${currentLevel}`, {
         fontSize: '20px',
         fill: '#00ff00',
-        backgroundColor: '#000',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         padding: { x: 10, y: 5 }
     });
 
     driftText = this.add.text(16, 106, '', {
         fontSize: '18px',
         fill: '#00ffff',
-        backgroundColor: '#000',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         padding: { x: 10, y: 5 }
     });
 
@@ -415,69 +391,115 @@ function create() {
 
     // Instrukce
     const instructionText = isMobile
-        ? 'Použijte virtuální tlačítka pro ovládání'
+        ? 'Klepněte kam chcete jet | DRIFT tlačítko = drift'
         : 'Šipky = pohyb | MEZERNÍK = drift při zatáčení';
 
     this.add.text(centerX, this.scale.height - 50, instructionText, {
         fontSize: '16px',
         fill: '#fff',
-        backgroundColor: '#000',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         padding: { x: 10, y: 5 }
     }).setOrigin(0.5);
 }
 
 function update() {
     if (gameOver) {
-        // Restartování hry po stisknutí mezerníku (od levelu 1)
-        if (Phaser.Input.Keyboard.JustDown(spaceKey)) {
-            restartGame(this);
+        // Na desktopu - klávesové ovládání
+        if (!isMobile) {
+            // Restartování hry po stisknutí mezerníku (od levelu 1)
+            if (Phaser.Input.Keyboard.JustDown(spaceKey)) {
+                restartGame(this);
+            }
+            // Pokračování v aktuálním levelu po stisknutí R
+            if (Phaser.Input.Keyboard.JustDown(rKey)) {
+                restartCurrentLevel(this);
+            }
         }
-        // Pokračování v aktuálním levelu po stisknutí R
-        if (Phaser.Input.Keyboard.JustDown(rKey)) {
-            restartCurrentLevel(this);
-        }
+        // Na mobilu se restart děje kliknutím na overlay (viz endGame funkce)
         return;
     }
 
-    const speed = 0.096; // Zvýšeno 12x (bylo 0.008, pak 0.016, pak 0.032, teď 0.096)
-    let turnSpeed = 0.1; // Zvýšeno 2x (bylo 0.05)
+    const speed = 0.0768; // Sníženo o 20% (bylo 0.096)
+    let turnSpeed = 0.08; // Sníženo o 20% (bylo 0.1)
 
     let moving = false;
     let turning = false;
 
-    // Pohyb vpřed
-    if (cursors.up.isDown || touchControls.up) {
-        const angle = car.rotation;
-        const speedMultiplier = isDrifting ? 1.2 : 1.0; // Mírně rychlejší během driftu
-        const totalSpeedMultiplier = speedMultiplier * (1 + driftBoost) * (1 + driftSpeedBoost);
-        car.setVelocity(
-            Math.sin(angle) * speed * 100 * totalSpeedMultiplier,
-            -Math.cos(angle) * speed * 100 * totalSpeedMultiplier
-        );
-        moving = true;
-        currentSpeed = Math.min(currentSpeed + 24, 1200 + driftBoost * 50); // Zvýšeno 3x (bylo +8, max 400)
-    }
-    // Pohyb vzad
-    else if (cursors.down.isDown || touchControls.down) {
-        const angle = car.rotation;
-        car.setVelocity(
-            -Math.sin(angle) * speed * 60,
-            Math.cos(angle) * speed * 60
-        );
-        moving = true;
-        currentSpeed = Math.min(currentSpeed + 12, 600); // Zvýšeno 3x (bylo +4, max 200)
-    }
+    // Na mobilu - sledování prstu
+    if (isMobile && touchControls.targetX !== null && touchControls.targetY !== null) {
+        // Vypočítej úhel k cíli
+        const angleToTarget = Phaser.Math.Angle.Between(car.x, car.y, touchControls.targetX, touchControls.targetY);
+        const targetAngleDeg = Phaser.Math.RadToDeg(angleToTarget) + 90; // +90° pro správnou orientaci
 
-    // Detekce zatáčení
-    if (cursors.left.isDown || cursors.right.isDown || touchControls.left || touchControls.right) {
-        turning = true;
+        // Vypočítej vzdálenost k cíli
+        const distance = Phaser.Math.Distance.Between(car.x, car.y, touchControls.targetX, touchControls.targetY);
+
+        // Pohyb vpřed směrem k cíli
+        const minDistance = 30; // Minimální vzdálenost
+        if (distance > minDistance) {
+            const angle = car.rotation;
+            const speedMultiplier = isDrifting ? 1.2 : 1.0;
+            const totalSpeedMultiplier = speedMultiplier * (1 + driftBoost) * (1 + driftSpeedBoost);
+            car.setVelocity(
+                Math.sin(angle) * speed * 100 * totalSpeedMultiplier,
+                -Math.cos(angle) * speed * 100 * totalSpeedMultiplier
+            );
+            moving = true;
+            currentSpeed = Math.min(currentSpeed + 24, 1200 + driftBoost * 50);
+
+            // Otáčení směrem k cíli
+            let angleDiff = Phaser.Math.Angle.ShortestBetween(car.angle, targetAngleDeg);
+            if (Math.abs(angleDiff) > 5) {
+                turning = true;
+                if (angleDiff > 0) {
+                    car.setAngularVelocity(turnSpeed);
+                } else {
+                    car.setAngularVelocity(-turnSpeed);
+                }
+            } else {
+                car.setAngularVelocity(0);
+            }
+        }
+    }
+    // Na desktopu - klávesnice
+    else if (!isMobile) {
+        // Pohyb vpřed
+        if (cursors.up.isDown) {
+            const angle = car.rotation;
+            const speedMultiplier = isDrifting ? 1.2 : 1.0; // Mírně rychlejší během driftu
+            const totalSpeedMultiplier = speedMultiplier * (1 + driftBoost) * (1 + driftSpeedBoost);
+            car.setVelocity(
+                Math.sin(angle) * speed * 100 * totalSpeedMultiplier,
+                -Math.cos(angle) * speed * 100 * totalSpeedMultiplier
+            );
+            moving = true;
+            currentSpeed = Math.min(currentSpeed + 24, 1200 + driftBoost * 50);
+        }
+        // Pohyb vzad
+        else if (cursors.down.isDown) {
+            const angle = car.rotation;
+            car.setVelocity(
+                -Math.sin(angle) * speed * 60,
+                Math.cos(angle) * speed * 60
+            );
+            moving = true;
+            currentSpeed = Math.min(currentSpeed + 12, 600);
+        }
+
+        // Detekce zatáčení
+        if (cursors.left.isDown || cursors.right.isDown) {
+            turning = true;
+        }
     }
 
     // DRIFT MECHANIKA
     const wasDrifting = isDrifting;
 
-    // Aktivace driftu: mezerník + pohyb vpřed + zatáčení + minimální rychlost
-    if ((spaceKey.isDown || touchControls.drift) && (cursors.up.isDown || touchControls.up) && turning && currentSpeed > 50) {
+    // Aktivace driftu: (mezerník na desktopu / drift tlačítko na mobilu) + pohyb vpřed + zatáčení + minimální rychlost
+    const driftPressed = isMobile ? touchControls.drift : spaceKey.isDown;
+    const movingForward = isMobile ? (touchControls.targetX !== null && touchControls.targetY !== null) : cursors.up.isDown;
+
+    if (driftPressed && movingForward && turning && currentSpeed > 50) {
         if (!isDrifting) {
             isDrifting = true;
             driftTime = 0;
@@ -485,7 +507,7 @@ function update() {
         }
 
         // Zvýšený turnSpeed během driftu
-        turnSpeed = 0.18;
+        turnSpeed = 0.144; // Sníženo o 20% (bylo 0.18)
         driftTime += 0.016; // Delta time (přibližně)
 
         // Aktualizace drift textu
@@ -550,16 +572,17 @@ function update() {
         driftParticles.emitting = false;
     }
 
-    // Otáčení doleva
-    if ((cursors.left.isDown || touchControls.left) && moving) {
-        car.setAngularVelocity(-turnSpeed);
-    }
-    // Otáčení doprava
-    else if ((cursors.right.isDown || touchControls.right) && moving) {
-        car.setAngularVelocity(turnSpeed);
-    }
-    else {
-        car.setAngularVelocity(0);
+    // Otáčení - pouze na desktopu (na mobilu se otáčí automaticky k cíli)
+    if (!isMobile) {
+        if (cursors.left.isDown && moving) {
+            car.setAngularVelocity(-turnSpeed);
+        }
+        else if (cursors.right.isDown && moving) {
+            car.setAngularVelocity(turnSpeed);
+        }
+        else {
+            car.setAngularVelocity(0);
+        }
     }
 
     // Zpomalení při nepohybu
@@ -608,10 +631,10 @@ function update() {
         levelText.setStyle({ fill: '#00ff00' }); // Zelená barva
     }
 
-    // Pohyb policejních aut - 1/6 rychlosti formule (sníženo na 1/2), používá stejný engine
-    const policeBaseSpeed = 0.016; // Základní rychlost - 1/6 rychlosti formule (0.096)
+    // Pohyb policejních aut - 1/6 rychlosti formule, sníženo o 20%
+    const policeBaseSpeed = 0.0128; // Základní rychlost snížena o 20% (bylo 0.016)
     const policeSpeed = policeBaseSpeed * policeSpeedMultiplier; // Aplikuj multiplier
-    const policeTurnSpeed = 0.05; // Rychlost otáčení
+    const policeTurnSpeed = 0.04; // Rychlost otáčení snížena o 20% (bylo 0.05)
 
     obstacles.forEach((obstacle) => {
         const bounds = this.scale;
@@ -690,7 +713,7 @@ function update() {
 
                 // Zkontroluj, zda je nějaká pneumatika nebezpečně blízko
                 let avoidAngle = null;
-                const avoidDistance = 120; // Vzdálenost pro vyhýbání
+                const avoidDistance = isMobile ? 84 : 120; // Vzdálenost pro vyhýbání - na mobilu 30% menší
 
                 bonuses.forEach((bonus) => {
                     const distanceToBonus = Phaser.Math.Distance.Between(
@@ -777,6 +800,14 @@ function endGame(scene) {
     const centerY = scene.scale.height / 2;
     const overlay = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0.7);
 
+    // Na mobilu - overlay je interaktivní pro restart
+    if (isMobile) {
+        overlay.setInteractive();
+        overlay.on('pointerdown', () => {
+            restartGame(scene);
+        });
+    }
+
     // Text Game Over
     gameOverText = scene.add.text(centerX, centerY - 80, 'GAME OVER!', {
         fontSize: '64px',
@@ -807,26 +838,43 @@ function endGame(scene) {
         fill: '#fff'
     }).setOrigin(0.5);
 
-    // Text pro restart od začátku
-    const restartText1 = scene.add.text(centerX, centerY + 100, 'MEZERNÍK - Restart od levelu 1', {
-        fontSize: '18px',
-        fill: '#ffff00'
-    }).setOrigin(0.5);
+    // Text pro restart - různý pro mobil a desktop
+    if (isMobile) {
+        // Na mobilu jen jednoduchá zpráva
+        restartText = scene.add.text(centerX, centerY + 100, 'Klepněte pro restart od levelu 1', {
+            fontSize: '20px',
+            fill: '#ffff00'
+        }).setOrigin(0.5);
 
-    // Text pro pokračování v levelu
-    restartText = scene.add.text(centerX, centerY + 130, 'R - Zkusit znovu level ' + currentLevel, {
-        fontSize: '18px',
-        fill: '#00ff00'
-    }).setOrigin(0.5);
+        // Blikání textu
+        scene.tweens.add({
+            targets: restartText,
+            alpha: 0.3,
+            duration: 500,
+            yoyo: true,
+            repeat: -1
+        });
+    } else {
+        // Na desktopu obě možnosti
+        const restartText1 = scene.add.text(centerX, centerY + 100, 'MEZERNÍK - Restart od levelu 1', {
+            fontSize: '18px',
+            fill: '#ffff00'
+        }).setOrigin(0.5);
 
-    // Blikání obou textů
-    scene.tweens.add({
-        targets: [restartText1, restartText],
-        alpha: 0.3,
-        duration: 500,
-        yoyo: true,
-        repeat: -1
-    });
+        restartText = scene.add.text(centerX, centerY + 130, 'R - Zkusit znovu level ' + currentLevel, {
+            fontSize: '18px',
+            fill: '#00ff00'
+        }).setOrigin(0.5);
+
+        // Blikání obou textů
+        scene.tweens.add({
+            targets: [restartText1, restartText],
+            alpha: 0.3,
+            duration: 500,
+            yoyo: true,
+            repeat: -1
+        });
+    }
 }
 
 function nextLevel(scene) {
